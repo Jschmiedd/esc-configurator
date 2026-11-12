@@ -72,6 +72,9 @@ class App extends Component {
     this.serial = undefined;
     this.lastConnected = 0;
 
+    // Each ESC as last read healthy, to migrate its settings after a failed flash
+    this.healthyEscs = [];
+
     // Redefine the console and tee logs
     window.console.debug = (text, ...args) => {
       const msg = [text, args.join(' ')].join(' ');
@@ -154,6 +157,7 @@ class App extends Component {
     TagManager.dataLayer({ dataLayer: { event: "Unplugged" } });
     this.addLogMessage('unplugged');
     this.lastConnected = 0;
+    this.healthyEscs = [];
 
     const availablePorts = await this.serialApi.getPorts();
     const portNames = availablePorts.map((item) => {
@@ -345,6 +349,7 @@ class App extends Component {
     }
 
     this.lastConnected = 0;
+    this.healthyEscs = [];
 
     store.dispatch(setFourWay(false));
     store.dispatch(setOpen(false));
@@ -382,12 +387,26 @@ class App extends Component {
         }
       };
 
+      /**
+       * An ESC marked FLASH*FAILED lost its settings: they are migrated from
+       * the last time it was read healthy, as for any other flash.
+       */
+      const healthy = this.healthyEscs[target];
+      const migrateFrom = isFlashFailed(esc) && healthy ? {
+        ...esc,
+        firmwareName: healthy.firmwareName,
+        individualSettings: healthy.individualSettings,
+        layoutRevision: healthy.layoutRevision,
+        settings: healthy.settings,
+      } : esc;
+
       this.addLogMessage('flashingEsc', { index: target + 1 });
-      const result = await this.serial.writeHex(target, esc, text, force, migration, updateProgress);
+      const result = await this.serial.writeHex(target, migrateFrom, text, force, migration, updateProgress);
       updateProgress(0);
 
       if(result) {
         result.index = target;
+        this.healthyEscs[target] = result;
         const individualIndex = individual.findIndex((esc) => esc.index === target);
 
         store.dispatch(setIndividualAtIndex({
@@ -516,6 +535,10 @@ class App extends Component {
         const settings = await this.handleReadEsc(i);
         settings.index = i;
         individual.push(settings);
+
+        if(!isFlashFailed(settings)) {
+          this.healthyEscs[i] = settings;
+        }
 
         this.addLogMessage('readEsc', {
           index: i + 1,

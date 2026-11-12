@@ -193,6 +193,96 @@ describe('App writing common settings', () => {
   });
 });
 
+describe('App flashing an ESC marked FLASH*FAILED', () => {
+  const healthy = {
+    firmwareName: 'Bluejay',
+    individualSettings: { NAME: 'Bluejay' },
+    layoutRevision: '206',
+    meta: { available: true },
+    settings: {
+      NAME: 'Bluejay',
+      BEEP_STRENGTH: 41,
+    },
+  };
+
+  const failed = {
+    firmwareName: 'BLHeli_S',
+    individualSettings: { NAME: '**FLASH*FAILED**' },
+    layoutRevision: '33',
+    meta: {
+      available: true,
+      signature: 0xE8B2,
+    },
+    settings: { NAME: '**FLASH*FAILED**' },
+  };
+
+  const setup = () => {
+    const { App: AppClass } = require('../');
+    const {
+      setConnected,
+      setIndividual,
+      setTargets,
+    } = require('../escsSlice');
+    const app = new AppClass();
+    app.addLogMessage = jest.fn();
+    app.lastConnected = 1;
+    app.serial = {
+      flashPreflight: jest.fn(),
+      writeHex: jest.fn(async() => null),
+    };
+    store.dispatch(setConnected(1));
+    store.dispatch(setTargets([0]));
+
+    const cleanUp = () => {
+      store.dispatch(setConnected(0));
+      store.dispatch(setTargets([]));
+      store.dispatch(setIndividual([]));
+    };
+
+    return {
+      app,
+      cleanUp,
+    };
+  };
+
+  it('should migrate the settings the ESC had when it was last read healthy', async() => {
+    const {
+      app, cleanUp,
+    } = setup();
+
+    // Read healthy, then the flash is cut: read again marked FLASH*FAILED
+    app.handleReadEsc = jest.fn()
+      .mockResolvedValueOnce({ ...healthy })
+      .mockResolvedValueOnce({ ...failed });
+    await app.handleReadEscs();
+    await app.handleReadEscs();
+
+    await app.flash('hex', false, 'same');
+
+    const migrateFrom = app.serial.writeHex.mock.calls[0][1];
+    expect(migrateFrom.settings).toEqual(healthy.settings);
+    expect(migrateFrom.individualSettings).toEqual(healthy.individualSettings);
+    expect(migrateFrom.firmwareName).toEqual('Bluejay');
+    // The ESC itself is flashed as it is now
+    expect(migrateFrom.meta).toEqual(failed.meta);
+    cleanUp();
+  });
+
+  it('should flash a healthy ESC with its own settings', async() => {
+    const {
+      app, cleanUp,
+    } = setup();
+
+    app.handleReadEsc = jest.fn().mockResolvedValueOnce({ ...healthy });
+    await app.handleReadEscs();
+
+    await app.flash('hex', false, 'same');
+
+    expect(app.serial.writeHex.mock.calls[0][1].settings).toEqual(healthy.settings);
+    cleanUp();
+  });
+});
+
 describe('App with an ESC marked FLASH*FAILED', () => {
   const esc = (index, name, beep) => ({
     index,

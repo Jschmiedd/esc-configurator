@@ -36,6 +36,12 @@ function Slider({
     setCurrentValue(value);
   }, [value]);
 
+  // Out of sync, the slider shows its minimum until the user moves it
+  const [moved, setMoved] = useState(false);
+  useEffect(() => {
+    setMoved(false);
+  }, [inSync]);
+
   const getDisplayValue = () => {
     let value = factor * currentValue + offset;
 
@@ -50,6 +56,7 @@ function Slider({
   const updateValue = useCallback((value) => {
     value = Math.floor((value - offset) / factor);
     setCurrentValue(value);
+    setMoved(true);
   }, [offset, factor]);
 
   // Makes no sense to test, component has its own test, we just assume that
@@ -88,7 +95,7 @@ function Slider({
             onChange={updateValue}
             onChangeComplete={handleUpdate}
             step={step}
-            value={inSync ? getDisplayValue() : min}
+            value={inSync || moved ? getDisplayValue() : min}
           />
         </div>
 

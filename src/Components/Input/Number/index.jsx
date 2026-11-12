@@ -1,6 +1,7 @@
 import React, {
   useCallback,
   useState,
+  useEffect,
 } from 'react';
 import PropTypes from 'prop-types';
 
@@ -23,6 +24,9 @@ function Number({
   disabled,
 }) {
   const [displayValue, setDisplayValue] = useState(value * factor + offset);
+  useEffect(() => {
+    setDisplayValue(value * factor + offset);
+  }, [value, factor, offset]);
 
   const updateValue = useCallback(() => {
     let value = displayValue;

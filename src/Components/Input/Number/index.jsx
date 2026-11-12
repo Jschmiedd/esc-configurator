@@ -23,10 +23,13 @@ function Number({
   hint,
   disabled,
 }) {
-  const [displayValue, setDisplayValue] = useState(value * factor + offset);
+  // Shown as a whole number, as the slider does: 51 * 1000 / 2047 + 1000 is 1025
+  const toDisplayValue = useCallback((value) => Math.round(value * factor + offset), [factor, offset]);
+
+  const [displayValue, setDisplayValue] = useState(toDisplayValue(value));
   useEffect(() => {
-    setDisplayValue(value * factor + offset);
-  }, [value, factor, offset]);
+    setDisplayValue(toDisplayValue(value));
+  }, [value, toDisplayValue]);
 
   const updateValue = useCallback(() => {
     let value = displayValue;
@@ -45,9 +48,9 @@ function Number({
       value = (min - offset) / factor;
     }
 
-    setDisplayValue(value * factor + offset);
+    setDisplayValue(toDisplayValue(value));
     onChange(name, value);
-  }, [displayValue, offset, factor, min, max, onChange, name]);
+  }, [displayValue, offset, factor, min, max, onChange, name, toDisplayValue]);
 
   const handleChange = useCallback((e) => {
     let value = parseInt(e.target.value, 10);

@@ -109,4 +109,35 @@ describe('Number', () => {
 
     expect(screen.getByRole(/spinbutton/i)).toHaveValue(39);
   });
+
+  it('should show a whole number when the display factor is not', () => {
+    const onChange = jest.fn();
+
+    // Bluejay "Startup power min": raw 51 is shown as 1025 by the slider
+    render(
+      <Number
+        factor={1000 / 2047}
+        label="test"
+        max={1125}
+        min={1000}
+        name="test"
+        offset={1000}
+        onChange={onChange}
+        value={51}
+      />
+    );
+
+    expect(screen.getByRole(/spinbutton/i)).toHaveValue(1025);
+
+    fireEvent.change(screen.getByRole(/spinbutton/i), {
+      target: {
+        value: 1025,
+        name: 'test',
+      },
+    });
+    fireEvent.blur(screen.getByRole(/spinbutton/i));
+
+    expect(onChange).toHaveBeenCalledWith('test', 51);
+    expect(screen.getByRole(/spinbutton/i)).toHaveValue(1025);
+  });
 });
